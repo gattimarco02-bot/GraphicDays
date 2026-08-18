@@ -1,1256 +1,592 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mostra Fotografica & Mosaico Generazionale</title>
-
-    <!-- Google Fonts per la tipografia della mostra -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Playfair+Display:ital,wght@1,600;1,800&display=swap" rel="stylesheet">
-
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                        serif: ['Playfair Display', 'serif'],
-                    }
-                }
-            }
-        }
-    </script>
-
-    <!-- Font Awesome per le icone -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-    <style>
-        /* Aggiunta dei font personalizzati */
-        @font-face {
-            font-family: 'Stolz';
-            src: local('Stolz'), local('Arial'); /* Se i font non sono installati, usa fallback */
-        }
-        @font-face {
-            font-family: 'Altesse';
-            src: local('Altesse'), local('Brush Script MT'); /* Se i font non sono installati, usa fallback */
-        }
-
-        /* Personalizzazioni CSS per grafica e reattività */
-        body {
-            background-color: #0f172a;
-            color: #f8fafc;
-            font-family: 'Inter', sans-serif;
-            overflow-x: hidden;
-        }
-
-        .canvas-container {
-            max-width: 100%;
-            aspect-ratio: 3 / 4;
-            position: relative;
-        }
-
-        canvas {
-            width: 100% !important;
-            height: auto !important;
-            display: block;
-            border-radius: 0.75rem;
-        }
-
-        /* Effetti di sfocatura e card con opacità */
-        .glass-card {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        /* Notifica Toast personalizzata */
-        #toastContainer {
-            position: fixed;
-            bottom: 1.5rem;
-            right: 1.5rem;
-            z-index: 9999;
-            pointer-events: none;
-        }
-
-        .toast {
-            pointer-events: auto;
-            transition: all 0.3s ease;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mostra Interattiva - Ritratti e Generazioni</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+    }
+    .toggle-checkbox:checked {
+      right: 0;
+      border-color: #fca456;
+    }
+    .toggle-checkbox:checked + .toggle-label {
+      background-color: #fca456;
+    }
+  </style>
 </head>
-<body class="min-h-screen flex flex-col justify-between">
+<body class="min-h-screen flex flex-col items-center p-4 md:p-8">
 
-    <!-- Header e Barra di Navigazione -->
-    <header class="glass-card sticky top-0 z-50 px-4 py-3 border-b border-slate-800">
-        <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
-            <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-rose-500 flex items-center justify-center font-bold text-slate-950 shadow-md">
-                    <i class="fa-solid fa-shapes text-lg"></i>
-                </div>
-                <div>
-                    <h1 class="font-bold text-base sm:text-lg tracking-tight text-white leading-tight">Ritratti Generazionali</h1>
-                    <p class="text-xs text-slate-400">Mostra Fotografica & Mosaico delle Risposte</p>
-                </div>
-            </div>
-
-            <!-- Navigazione Tab -->
-            <div class="flex items-center bg-slate-900/80 p-1 rounded-xl border border-slate-800 text-xs sm:text-sm">
-                <button id="tabParticipateBtn" onclick="switchTab('participate')" class="px-3 py-1.5 rounded-lg font-medium transition bg-amber-500 text-slate-950 font-semibold shadow">
-                    <i class="fa-solid fa-camera mr-1"></i> Partecipa
-                </button>
-                <button id="tabStatsBtn" onclick="switchTab('stats')" class="px-3 py-1.5 rounded-lg font-medium transition text-slate-300 hover:text-white">
-                    <i class="fa-solid fa-chart-pie mr-1"></i> Statistiche & Mosaico
-                </button>
-                <button id="tabOrganizerBtn" onclick="openOrganizerModal()" class="px-3 py-1.5 rounded-lg font-medium transition text-slate-400 hover:text-amber-400">
-                    <i class="fa-solid fa-lock mr-1"></i> Area Riservata
-                </button>
-            </div>
-        </div>
-    </header>
-
-    <main class="max-w-6xl mx-auto w-full px-4 py-6 flex-grow">
-
-        <!-- ================= SECTION 1: PARTECIPA (CREA RITRATTO) ================= -->
-        <section id="participateView" class="space-y-6">
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                
-                <!-- Colonna Sinistra: Modulo Quesiti e Dati Anagrafici -->
-                <div class="lg:col-span-7 space-y-6">
-                    <div class="glass-card p-5 sm:p-6 rounded-2xl shadow-xl space-y-5">
-                        <div>
-                            <h2 class="text-xl font-bold text-slate-100 flex items-center gap-2">
-                                <span class="text-amber-400">1.</span> Inserisci i tuoi dati
-                            </h2>
-                            <p class="text-xs text-slate-400 mt-1">Nome ed età personalizzano la grafica del tuo ritratto e la tessera generazionale.</p>
-                        </div>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-300 mb-1">Nome o Iniziale</label>
-                                <input type="text" id="inputName" placeholder="NOME" value="" class="w-full px-3.5 py-2.5 bg-slate-900/90 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 uppercase tracking-wider text-sm font-semibold transition">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-300 mb-1">Età (Anni)</label>
-                                <input type="number" id="inputAge" min="1" max="120" placeholder="ETÀ" value="" class="w-full px-3.5 py-2.5 bg-slate-900/90 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 text-sm font-semibold transition">
-                            </div>
-                        </div>
-
-                        <div class="pt-2">
-                            <div class="flex items-center justify-between mb-3">
-                                <h2 class="text-xl font-bold text-slate-100 flex items-center gap-2">
-                                    <span class="text-amber-400">2.</span> Rispondi ai 16 Quesiti
-                                </h2>
-                                <span id="yesCountBadge" class="px-2.5 py-1 bg-amber-500/20 text-amber-300 text-xs font-semibold rounded-full border border-amber-500/30">
-                                    8 Sì selezionati
-                                </span>
-                            </div>
-                            <p class="text-xs text-slate-400 mb-4">I "SÌ" corrisponderanno ai quadrati pieni colorati sovrapposti al tuo selfie.</p>
-
-                            <!-- Griglia 16 Domande -->
-                            <div id="questionsContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[380px] overflow-y-auto pr-1 custom-scrollbar">
-                                <!-- Le domande vengono generate dinamicamente in JS -->
-                            </div>
-                        </div>
-
-                        <!-- Caricamento Selfie -->
-                        <div class="pt-2 border-t border-slate-800">
-                            <h2 class="text-xl font-bold text-slate-100 flex items-center gap-2 mb-2">
-                                <span class="text-amber-400">3.</span> Carica il tuo Selfie
-                            </h2>
-                            <p class="text-xs text-slate-400 mb-3">Scegli una foto in verticale o scatta un selfie col telefono.</p>
-                            
-                            <label class="flex flex-col items-center justify-center border-2 border-dashed border-slate-700 hover:border-amber-500/80 bg-slate-900/50 hover:bg-slate-900 transition rounded-xl p-4 cursor-pointer text-center group">
-                                <i class="fa-solid fa-cloud-arrow-up text-2xl text-slate-400 group-hover:text-amber-400 mb-1 transition"></i>
-                                <span class="text-xs font-medium text-slate-300 group-hover:text-white">Seleziona Immagine o Scatta Foto</span>
-                                <span class="text-[10px] text-slate-500 mt-0.5">La tua foto NON verrà salvata nei server (Privacy 100%)</span>
-                                <input type="file" id="imageInput" accept="image/*" class="hidden">
-                            </label>
-                        </div>
-                        
-                        <!-- Pulsante di Generazione Finale -->
-                        <div class="pt-4">
-                            <button onclick="generatePortrait()" class="w-full py-3.5 px-4 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold rounded-xl transition shadow-lg flex items-center justify-center gap-2 text-sm">
-                                <i class="fa-solid fa-wand-magic-sparkles"></i> Genera il tuo Ritratto
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Colonna Destra: Anteprima Canvas e Azioni -->
-                <div class="lg:col-span-5 space-y-5 lg:sticky lg:top-20">
-                    <div class="glass-card p-5 rounded-2xl shadow-xl space-y-4">
-                        <div class="flex items-center justify-between">
-                            <h3 class="font-bold text-slate-200 text-base flex items-center gap-2">
-                                <i class="fa-solid fa-image text-amber-400"></i> Il Tuo Ritratto Finale
-                            </h3>
-                            <span class="text-[11px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-md">Formato 3:4</span>
-                        </div>
-
-                        <!-- Container Canvas -->
-                        <div class="canvas-container bg-slate-950 rounded-xl overflow-hidden border border-slate-800 shadow-2xl relative">
-                            <canvas id="portraitCanvas" width="900" height="1200"></canvas>
-                        </div>
-
-                        <!-- Parole Chiave Estratte -->
-                        <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-1">
-                            <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Parole chiave estrapolate:</div>
-                            <div id="keywordsDisplay" class="text-xs font-bold text-amber-300 tracking-widest flex flex-wrap gap-2">
-                                SPAZI • COMUNITARI • PARTECIPAZIONE • ASSOCIATIVA
-                            </div>
-                        </div>
-
-                        <!-- Pulsanti d'Azione -->
-                        <div class="space-y-2.5 pt-1">
-                            <button id="downloadSelfieBtn" onclick="downloadPortrait()" class="w-full py-3 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold rounded-xl transition shadow-lg flex items-center justify-center gap-2 text-sm">
-                                <i class="fa-solid fa-arrow-down-to-line"></i> Scarica Ritratto Personalizzato (PNG)
-                            </button>
-
-                            <button id="shareInstagramBtn" onclick="shareToInstagram()" class="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-2 text-xs">
-                                <i class="fa-brands fa-instagram text-pink-400 text-sm"></i> Condividi su Instagram / Social
-                            </button>
-
-                            <button id="sendToExhibitionBtn" onclick="sendSubmissionToDatabase()" class="w-full py-2.5 px-4 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 font-semibold rounded-xl border border-emerald-500/30 transition flex items-center justify-center gap-2 text-xs">
-                                <i class="fa-solid fa-paper-plane text-emerald-400"></i> 🏛️ Invia Risposte alla Mostra (Senza Foto)
-                            </button>
-                        </div>
-
-                        <!-- Avviso Privacy -->
-                        <p class="text-[11px] text-slate-400 text-center leading-relaxed">
-                            <i class="fa-solid fa-shield-halved text-emerald-400 mr-1"></i>
-                            <strong>Rispetto della Privacy:</strong> Alla mostra invii solo le 16 risposte (SÌ/NO) per la statistica e la tessera grafica. La tua foto rimane unicamente sul tuo telefono.
-                        </p>
-                    </div>
-                </div>
-
-            </div>
-        </section>
-
-        <!-- ================= SECTION 2: STATISTICHE & MOSAICO GRAFICO ================= -->
-        <section id="statsView" class="space-y-8 hidden">
-            
-            <!-- Intestazione Sezione -->
-            <div class="glass-card p-6 rounded-2xl border border-slate-800 space-y-2">
-                <h2 class="text-2xl font-bold text-white flex items-center gap-2">
-                    <i class="fa-solid fa-chart-column text-amber-400"></i> Risultati Collettivi & Mosaico Generazionale
-                </h2>
-                <p class="text-sm text-slate-300">
-                    Esplora le risposte aggregate dei partecipanti alla mostra. I dati mostrano le visioni sulla longevità divise per fasce d'età.
-                </p>
-            </div>
-
-            <!-- Carte Metriche Generali -->
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div class="glass-card p-5 rounded-xl border border-slate-800 text-center space-y-1">
-                    <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Partecipanti Totali</div>
-                    <div id="statTotalSubmissions" class="text-3xl font-extrabold text-amber-400">0</div>
-                    <div class="text-[11px] text-slate-500">Persone che hanno compilato il test</div>
-                </div>
-                <div class="glass-card p-5 rounded-xl border border-slate-800 text-center space-y-1">
-                    <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Età Media</div>
-                    <div id="statAverageAge" class="text-3xl font-extrabold text-emerald-400">--</div>
-                    <div class="text-[11px] text-slate-500">Anni dei partecipanti</div>
-                </div>
-                <div class="glass-card p-5 rounded-xl border border-slate-800 text-center space-y-1">
-                    <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Tessera Più Frequente</div>
-                    <div id="statTopCategory" class="text-2xl font-bold text-rose-400 truncate px-2">--</div>
-                    <div class="text-[11px] text-slate-500">Parola chiave dominante</div>
-                </div>
-            </div>
-
-            <!-- Sub-Sezione: Matrici Medie Archetipo per Fascia d'Età -->
-            <div class="glass-card p-6 rounded-2xl border border-slate-800 space-y-6">
-                <div>
-                    <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                        <i class="fa-solid fa-border-all text-amber-400"></i> Archetipi Generazionali (Matrici Medie 4x4)
-                    </h3>
-                    <p class="text-xs text-slate-400 mt-1">
-                        Ogni griglia rappresenta la combinazione prevalente delle risposte (maggioranza di SÌ) per ogni fascia anagrafica. Scarica le immagini PNG crude (sfondo trasparente) per cataloghi o stampe.
-                    </p>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6" id="ageArchetypesContainer">
-                    <!-- Generato dinamicamente in JS -->
-                </div>
-            </div>
-
-            <!-- Sub-Sezione: Mosaico Grafico dei Singoli Partecipanti -->
-            <div class="glass-card p-6 rounded-2xl border border-slate-800 space-y-6">
-                <div class="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                        <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                            <i class="fa-solid fa-grip text-amber-400"></i> Mosaico Grafico dei Partecipanti
-                        </h3>
-                        <p class="text-xs text-slate-400 mt-1">
-                            Ogni tessera rappresenta le 16 risposte di una persona. Clicca su qualsiasi tessera per scaricare il file PNG trasparente.
-                        </p>
-                    </div>
-
-                    <!-- Filtri per Fascia d'Età -->
-                    <div class="flex flex-wrap gap-1.5 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs">
-                        <button class="mosaic-filter-btn px-3 py-1 rounded-lg bg-amber-500 text-slate-950 font-bold transition" data-filter="all">Tutti</button>
-                        <button class="mosaic-filter-btn px-3 py-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white transition" data-filter="18-35">18-35 Anni</button>
-                        <button class="mosaic-filter-btn px-3 py-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white transition" data-filter="36-50">36-50 Anni</button>
-                        <button class="mosaic-filter-btn px-3 py-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white transition" data-filter="51-75">51-75 Anni</button>
-                        <button class="mosaic-filter-btn px-3 py-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white transition" data-filter="76-85">76-85 Anni</button>
-                        <button class="mosaic-filter-btn px-3 py-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white transition" data-filter="85plus">&gt; 85 Anni</button>
-                    </div>
-                </div>
-
-                <!-- Griglia Tessere Mosaico -->
-                <div id="mosaicTilesContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                    <div class="col-span-full text-center text-slate-400 py-8">
-                        Caricamento tessere del mosaico...
-                    </div>
-                </div>
-            </div>
-
-            <!-- Classifica / Percentuali per ciascuna delle 16 Domande -->
-            <div class="glass-card p-6 rounded-2xl border border-slate-800 space-y-4">
-                <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                    <i class="fa-solid fa-list-check text-amber-400"></i> Percentuale Risposte SÌ per Domanda
-                </h3>
-                <div id="questionsStatsList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <!-- Generato dinamicamente in JS -->
-                </div>
-            </div>
-
-        </section>
-
-    </main>
-
-    <!-- ================= MODAL AREA RISERVATA (PROTEZIONE PIN) ================= -->
-    <div id="organizerModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
-        <div class="glass-card max-w-2xl w-full p-6 rounded-2xl border border-slate-700 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
-            
-            <div class="flex items-center justify-between border-b border-slate-800 pb-4">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-lg">
-                        <i class="fa-solid fa-user-shield"></i>
-                    </div>
-                    <div>
-                        <h3 class="font-bold text-lg text-white">Area Riservata Organizzatore</h3>
-                        <p class="text-xs text-slate-400">Esportazione dati per analisi e catalogo mostra</p>
-                    </div>
-                </div>
-                <button onclick="closeOrganizerModal()" class="text-slate-400 hover:text-white text-xl">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-
-            <!-- Form Inserimento PIN se non autenticato -->
-            <div id="pinAuthForm" class="space-y-4 py-4">
-                <p class="text-xs text-slate-300">Inserisci la password di sicurezza dell'organizzatore per accedere al download dei dati:</p>
-                <div class="flex gap-2">
-                    <input type="password" id="inputOrganizerPin" placeholder="Inserisci Password" class="flex-grow px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-amber-500 text-sm">
-                    <button onclick="verifyOrganizerPin()" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-sm transition">
-                        Sblocca
-                    </button>
-                </div>
-            </div>
-
-            <!-- Contenuto Riservato sbloccato -->
-            <div id="organizerContent" class="space-y-6 hidden">
-                <div class="flex flex-wrap gap-3">
-                    <button onclick="exportSubmissionsCSV()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-2 transition shadow">
-                        <i class="fa-solid fa-file-csv text-base"></i> Esporta Risposte (CSV per Excel)
-                    </button>
-                    <button onclick="exportSubmissionsJSON()" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-xs flex items-center gap-2 border border-slate-700 transition">
-                        <i class="fa-solid fa-code"></i> Esporta Dataset Dati (JSON)
-                    </button>
-                </div>
-
-                <!-- Tabella Ultimi Partecipanti -->
-                <div class="space-y-2">
-                    <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Registro Partecipanti (Risposte Anonimizzate)</h4>
-                    <div class="max-h-60 overflow-y-auto border border-slate-800 rounded-xl bg-slate-900/90 text-xs">
-                        <table class="w-full text-left border-collapse">
-                            <thead class="bg-slate-950 text-slate-400 sticky top-0 border-b border-slate-800">
-                                <tr>
-                                    <th class="p-2.5">Nome</th>
-                                    <th class="p-2.5">Età</th>
-                                    <th class="p-2.5">Totale SÌ</th>
-                                    <th class="p-2.5">Parole Chiave</th>
-                                    <th class="p-2.5">Data Invio</th>
-                                </tr>
-                            </thead>
-                            <tbody id="organizerTableBody" class="divide-y divide-slate-800 text-slate-300">
-                                <!-- Righe inserite dinamicamente -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-        </div>
+  <!-- Header -->
+  <header class="w-full max-w-5xl flex justify-between items-center pb-6 border-b border-slate-800 mb-8">
+    <div>
+      <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-white">Generazioni in Mostra</h1>
+      <p class="text-slate-400 text-sm mt-1">Crea il tuo ritratto generazionale e contribuisci alla mappa collettiva</p>
     </div>
+    <button onclick="openAdminModal()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-lg border border-slate-700 transition">
+      🔒 Area Riservata
+    </button>
+  </header>
 
-    <!-- Container Toast per Notifiche -->
-    <div id="toastContainer"></div>
+  <!-- Main Container -->
+  <main class="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+    
+    <!-- Colonna Sinistra: Input e Questionario -->
+    <section class="lg:col-span-7 flex flex-col gap-6">
+      
+      <!-- Anagrafica -->
+      <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl flex flex-col gap-4">
+        <h2 class="text-lg font-semibold text-slate-200">1. I tuoi Dati</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Nome</label>
+            <input type="text" id="inputName" placeholder="Nome" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Età</label>
+            <input type="number" id="inputAge" placeholder="Es. 80" min="1" max="120" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400">
+          </div>
+        </div>
 
-    <!-- Script Firebase & Logica Applicazione -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        <!-- Caricamento Foto / Selfie -->
+        <div class="mt-2">
+          <label class="block text-xs font-medium text-slate-400 mb-2">Scatta o Carica una foto</label>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-750 border border-slate-700 hover:border-slate-600 rounded-xl p-3 cursor-pointer text-sm font-medium transition text-center">
+              <span>📸 Scatta Selfie</span>
+              <input type="file" id="cameraInput" accept="image/*" capture="user" class="hidden" onchange="handleImageUpload(event)">
+            </label>
+            <label class="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-750 border border-slate-700 hover:border-slate-600 rounded-xl p-3 cursor-pointer text-sm font-medium transition text-center">
+              <span>🖼️ Galleria</span>
+              <input type="file" id="galleryInput" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+            </label>
+          </div>
+        </div>
+      </div>
 
-        // CONFIGURAZIONE FIREBASE
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'mostra-anzianita-default';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-            apiKey: "demo-api-key",
-            authDomain: "demo.firebaseapp.com",
-            projectId: "demo-project",
-            storageBucket: "demo.appspot.com",
-            messagingSenderId: "123456789",
-            appId: "1:123456789:web:abcdef"
-        };
+      <!-- Questionario 16 Domande -->
+      <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl flex flex-col gap-4">
+        <div class="flex justify-between items-center">
+          <h2 class="text-lg font-semibold text-slate-200">2. Domande</h2>
+          <span class="text-xs text-slate-400">Attiva l'interruttore per rispondere SÌ</span>
+        </div>
 
-        let app, db, auth;
-        let currentUser = null;
-        let allSubmissions = [];
-        let isOrganizerAuthenticated = false;
+        <div id="questionsContainer" class="flex flex-col divide-y divide-slate-800/60 max-h-[420px] overflow-y-auto pr-2">
+          <!-- Generato via JS -->
+        </div>
+      </div>
 
-        // --- SISTEMA DI SICUREZZA HASH SHA-256 ---
-        // La password in chiaro NON è presente nel codice. 
-        // Viene generata la sua impronta crittografica (hash) in memoria all'avvio tramite un vettore offuscato.
-        let targetHashHex = "";
+      <!-- Bottone Genera -->
+      <button onclick="generatePortrait()" class="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-bold py-3.5 rounded-xl shadow-lg shadow-orange-500/20 transition transform active:scale-[0.99] text-base">
+        ✨ Genera il tuo Ritratto
+      </button>
+
+    </section>
+
+    <!-- Colonna Destra: Visualizzazione Ritratto Finale -->
+    <section class="lg:col-span-5 flex flex-col gap-6 sticky top-6">
+      <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl flex flex-col items-center gap-4">
+        <h2 class="text-lg font-semibold text-slate-200 self-start">Il Tuo Ritratto Finale</h2>
         
-        async function computeSHA256(text) {
-            const msgBuffer = new TextEncoder().encode(text);
-            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-        }
+        <div class="relative w-full max-w-[380px] aspect-[3/4] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 flex items-center justify-center shadow-2xl">
+          <canvas id="portraitCanvas" width="1080" height="1440" class="w-full h-full object-cover"></canvas>
+          <div id="placeholderText" class="absolute text-center text-slate-500 p-6">
+            <p class="text-sm">Carica una foto, compila le domande e premi <strong>"Genera il tuo Ritratto"</strong></p>
+          </div>
+        </div>
 
-        async function initSecurity() {
-            // Vettore matematico di sicurezza (non è la password testuale in chiaro)
-            const seed = [138, 124, 135, 135, 130, 133, 124, 116, 72, 73, 83];
-            const dec = seed.map(x => String.fromCharCode(x - 19)).join('');
-            targetHashHex = await computeSHA256(dec);
-        }
+        <!-- Azioni Post-Generazione -->
+        <div class="w-full max-w-[380px] flex flex-col gap-2.5 mt-2">
+          <button onclick="downloadPortraitImage()" id="btnDownloadPortrait" disabled class="w-full bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:hover:bg-slate-800 text-white font-medium py-2.5 rounded-xl border border-slate-700 transition flex items-center justify-center gap-2 text-sm">
+            💾 Salva Ritratto sul Telefono
+          </button>
+          <button onclick="submitToExhibition()" id="btnSubmitExhibition" disabled class="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white font-semibold py-3 rounded-xl shadow-lg shadow-emerald-900/30 transition flex items-center justify-center gap-2 text-sm">
+            🚀 Invia Risposte alla Mostra
+          </button>
+        </div>
+      </div>
+    </section>
 
-        // 16 Domande orientative sui temi dell'Anzianità / Longevità
-        const QUESTIONS = [
-            "Riesci a vedere le persone a te care quanto vorresti?",
-            "Hai momenti della settimana in cui soffri la solitudine?",
-            "Frequenti regolarmente un gruppo, un'associazione o un luogo di ritrovo?",
-            "Hai relazioni importanti al di fuori della tua famiglia?",
-            "C'è qualcuno che si prende cura di te quando ne hai bisogno?",
-            "C'è qualcuno che conta sul tuo aiuto nel quotidiano?",
-            "Riesci ad avere del tempo per te stesso?",
-            "Credi che ci siano servizi pubblici che si occupano dell’anziano?",
-            "Ti sposti in autonomia nella tua città?",
-            "Ti senti sicuro a muoverti da solo in città?",
-            "Riesci a raggiungere facilmente i servizi di prima necessità (spesa, farmacia, medici)?",
-            "La tua città è a misura di anziano?",
-            "Pensi che lo scambio tra generazioni diverse sia utile alla comunità?",
-            "Hai occasioni frequenti di parlare con persone di generazioni diverse dalla tua?",
-            "Senti che la tua generazione viene presa in considerazione nel discorso pubblico?",
-            "Trovi difficile capire i valori e le scelte delle altre generazioni?"
-        ];
+  </main>
 
-        // Mappa delle parole chiave associate ai quesiti
-        const KEYWORDS_MAP = [
-            "COMUNITÀ", "SPAZI", "PARTECIPAZIONE", "LEGAMI",
-            "INNOVAZIONE", "MEMORIA", "AUTONOMIA", "PROSSIMITÀ",
-            "CURA", "ABITARE", "RACCONTO", "CONDIVISIONE", "FUTURO", "FIDUCIA", "QUALITÀ", "SERENITÀ"
-        ];
+  <!-- Modal Area Riservata -->
+  <div id="adminModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl p-6 shadow-2xl flex flex-col gap-6 max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-4">
+        <h3 class="text-lg font-bold text-white">Area Riservata Curatore</h3>
+        <button onclick="closeAdminModal()" class="text-slate-400 hover:text-white text-xl leading-none">&times;</button>
+      </div>
 
-        // Stato locale risposte (array di 16 boolean inizializzato a false)
-        let userAnswers = new Array(16).fill(false);
-        let isGenerated = false; // Flag per bloccare la visualizzazione finché non si clicca Genera
+      <div id="adminAuthSection" class="flex flex-col gap-4">
+        <p class="text-sm text-slate-400">Inserisci la password di sicurezza per visualizzare i dati e le matrici aggregate.</p>
+        <div class="flex gap-2">
+          <input type="password" id="adminPasswordInput" placeholder="Password" class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-amber-400">
+          <button onclick="verifyAdminPassword()" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-5 py-2 rounded-xl transition">Accedi</button>
+        </div>
+        <p id="adminAuthError" class="text-xs text-rose-400 hidden">Password non corretta.</p>
+      </div>
 
-        // Immagine utente carica
-        let uploadedImage = null;
+      <div id="adminDashboardSection" class="hidden flex flex-col gap-6">
+        <div class="flex flex-wrap gap-3">
+          <button onclick="exportCSV()" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl border border-slate-700 text-xs font-medium transition">
+            📊 Esporta Dati in CSV (Excel)
+          </button>
+          <button onclick="downloadAgeArchetypePNG()" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl border border-slate-700 text-xs font-medium transition">
+            🖼️ Scarica Matrice Archetipo (PNG Trasparente)
+          </button>
+        </div>
+        
+        <div class="border border-slate-800 rounded-xl p-4 bg-slate-950">
+          <h4 class="text-sm font-semibold text-slate-300 mb-2">Registro Partecipanti Ricevuti</h4>
+          <div id="adminRecordsList" class="text-xs text-slate-400 flex flex-col gap-1 max-h-48 overflow-y-auto">
+            Caricamento dati in corso...
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-        window.addEventListener('DOMContentLoaded', async () => {
-            initQuestionsList();
-            initCanvasEvents();
-            initSecurity();
-            
-            try {
-                app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
+  <script>
+    // --- Configurazione Firebase ---
+    const firebaseConfig = {
+      apiKey: "INSERISCI_QUI_API_KEY",
+      authDomain: "INSERISCI_QUI_PROJECT_ID.firebaseapp.com",
+      projectId: "INSERISCI_QUI_PROJECT_ID",
+      storageBucket: "INSERISCI_QUI_PROJECT_ID.appspot.com",
+      messagingSenderId: "INSERISCI_QUI_SENDER_ID",
+      appId: "INSERISCI_QUI_APP_ID"
+    };
 
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
+    let db = null;
+    try {
+      if (firebaseConfig.apiKey && !firebaseConfig.apiKey.includes("INSERISCI_QUI")) {
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+      }
+    } catch(e) {
+      console.log("Database non configurato o in modalità locale:", e);
+    }
 
-                currentUser = auth.currentUser;
-                console.log("Autenticato anonimamente con UID:", currentUser?.uid);
+    // --- 16 Domande e Parole Chiave ---
+    const QUESTIONS_DATA = [
+      { text: "Riesci a vedere le persone a te care quanto vorresti?", keyword: "AFFETTI" },
+      { text: "Hai momenti della settimana in cui soffri la solitudine?", keyword: "SOLITUDINE" },
+      { text: "Frequenti regolarmente un gruppo, un'associazione o un luogo di ritrovo?", keyword: "COMUNITÀ" },
+      { text: "Hai relazioni importanti al di fuori della tua famiglia?", keyword: "RETI" },
+      { text: "C'è qualcuno che si prende cura di te quando ne hai bisogno?", keyword: "CURA" },
+      { text: "C'è qualcuno che conta sul tuo aiuto nel quotidiano?", keyword: "SOSTEGNO" },
+      { text: "Riesci ad avere del tempo per te stesso?", keyword: "TEMPO" },
+      { text: "Credi che ci siano servizi pubblici che si occupano dell’anziano?", keyword: "SERVIZI" },
+      { text: "Ti sposti in autonomia nella tua città?", keyword: "AUTONOMIA" },
+      { text: "Ti senti sicuro a muoverti da solo in città?", keyword: "SICUREZZA" },
+      { text: "Riesci a raggiungere facilmente i servizi di prima necessità (spesa, farmacia, medici)?", keyword: "ACCESSO" },
+      { text: "La tua città è a misura di anziano?", keyword: "SPAZIO" },
+      { text: "Pensi che lo scambio tra generazioni diverse sia utile alla comunità?", keyword: "SCAMBIO" },
+      { text: "Hai occasioni frequenti di parlare con persone di generazioni diverse dalla tua?", keyword: "DIALOGO" },
+      { text: "Senti che la tua generazione viene presa in considerazione nel discorso pubblico?", keyword: "VOCE" },
+      { text: "Trovi difficile capire i valori e le scelte delle altre generazioni?", keyword: "ASCOLTO" }
+    ];
 
-                // Ascolta in tempo reale le risposte inviate
-                listenToSubmissions();
+    const BACKUP_KEYWORDS = ["ESPERIENZA", "FUTURO", "MEMORIA", "PRESENTE", "VITA", "CAMMINO"];
 
-            } catch (err) {
-                console.warn("Inizializzazione Firebase locale / offline:", err.message);
-            }
+    // --- Palette Colori per Fascia d'Età ---
+    function getColorForAge(age) {
+      const a = parseInt(age, 10);
+      if (isNaN(a)) return "#8c52ff";
+      if (a >= 18 && a <= 35) return "#8c52ff";
+      if (a >= 36 && a <= 50) return "#fca456";
+      if (a > 50 && a <= 75) return "#feeeaf";
+      if (a > 75 && a <= 85) return "#ea565a";
+      if (a > 85) return "#cea5cd";
+      return "#8c52ff";
+    }
 
-            // Primo rendering Canvas
-            drawPortraitCanvas();
-        });
+    let loadedUserImage = null;
+    let currentSelectedKeywords = [];
 
-        function initQuestionsList() {
-            const container = document.getElementById('questionsContainer');
-            if (!container) return;
-            container.innerHTML = '';
-
-            QUESTIONS.forEach((qText, idx) => {
-                const card = document.createElement('div');
-                // Allineamento centrato verticalmente per gestire l'interruttore
-                card.className = `p-3 rounded-xl border transition cursor-pointer flex items-center justify-between gap-3 select-none ${userAnswers[idx] ? 'bg-amber-500/10 border-amber-500/40 text-amber-100' : 'bg-slate-900/60 border-slate-800 text-slate-400'}`;
-                
-                // Creazione della struttura con il Toggle Switch in stile iOS/Android (via Tailwind CSS)
-                card.innerHTML = `
-                    <label for="q_${idx}" class="text-xs font-medium cursor-pointer leading-snug flex-grow pr-2 pointer-events-none">
-                        <span class="font-bold mr-1 text-amber-400/90">${idx + 1}.</span> ${qText}
-                    </label>
-                    <div class="flex items-center gap-2 shrink-0">
-                        <span class="text-[10px] font-bold ${userAnswers[idx] ? 'text-amber-400' : 'text-slate-500'} w-4 text-right transition-colors" id="label_q_${idx}">
-                            ${userAnswers[idx] ? 'SÌ' : 'NO'}
-                        </span>
-                        <div class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" id="q_${idx}" ${userAnswers[idx] ? 'checked' : ''} class="sr-only peer">
-                            <div class="w-11 h-6 bg-slate-800 border border-slate-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-400 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500 peer-checked:after:bg-white shadow-inner"></div>
-                        </div>
-                    </div>
-                `;
-
-                const checkbox = card.querySelector('input');
-                const textLabel = card.querySelector(`#label_q_${idx}`);
-
-                checkbox.addEventListener('change', (e) => {
-                    userAnswers[idx] = e.target.checked;
-                    updateQuestionCardStyle(card, userAnswers[idx]);
-                    
-                    // Aggiorna la piccola scritta a fianco dell'interruttore
-                    textLabel.innerText = userAnswers[idx] ? 'SÌ' : 'NO';
-                    textLabel.className = `text-[10px] font-bold w-4 text-right transition-colors ${userAnswers[idx] ? 'text-amber-400' : 'text-slate-500'}`;
-                    
-                    updateBadgeCount();
-                    if(isGenerated) drawPortraitCanvas();
-                });
-
-                // Permette di fare click in qualsiasi punto della barra della domanda per spostare l'interruttore
-                card.addEventListener('click', (e) => {
-                    if (e.target !== checkbox && !e.target.closest('.relative')) {
-                        checkbox.checked = !checkbox.checked;
-                        checkbox.dispatchEvent(new Event('change')); // Innesca l'animazione e il cambio colore
-                    }
-                });
-
-                container.appendChild(card);
-            });
-
-            updateBadgeCount();
-        }
-
-        function updateQuestionCardStyle(card, isYes) {
-            if (isYes) {
-                card.className = 'p-3 rounded-xl border transition cursor-pointer flex items-center justify-between gap-3 select-none bg-amber-500/10 border-amber-500/40 text-amber-100';
-            } else {
-                card.className = 'p-3 rounded-xl border transition cursor-pointer flex items-center justify-between gap-3 select-none bg-slate-900/60 border-slate-800 text-slate-400';
-            }
-        }
-
-        function updateBadgeCount() {
-            const yesCount = userAnswers.filter(Boolean).length;
-            const badge = document.getElementById('yesCountBadge');
-            if (badge) {
-                badge.innerText = `${yesCount} Sì su 16`;
-            }
-        }
-
-        function initCanvasEvents() {
-            document.getElementById('inputName').addEventListener('input', () => { if(isGenerated) drawPortraitCanvas(); });
-            document.getElementById('inputAge').addEventListener('input', () => { if(isGenerated) drawPortraitCanvas(); });
-
-            const fileInput = document.getElementById('imageInput');
-            fileInput.addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                        const img = new Image();
-                        img.onload = () => {
-                            uploadedImage = img;
-                            isGenerated = false; // Quando si carica una nuova foto, nascondiamo di nuovo la matrice
-                            drawPortraitCanvas();
-                            showToast("Selfie caricato! Clicca su 'Genera il tuo Ritratto'.", "success");
-                        };
-                        img.src = event.target.result;
-                    };
-                    reader.readAsDataURL(file);
-                }
-            });
-        }
-
-        // Palette dei Colori in base all'Età
-        function getColorForAge(age) {
-            const numAge = parseInt(age, 10) || 60;
-            if (numAge <= 35) return "#8c52ff";     // 18 - 35
-            if (numAge <= 50) return "#fca456";     // 36 - 50
-            if (numAge <= 75) return "#feeeaf";     // 50 - 75
-            if (numAge <= 85) return "#ea565a";     // 75 - 85
-            return "#cea5cd";                       // > 85
-        }
-
-        window.generatePortrait = function() {
-            const name = document.getElementById('inputName').value.trim();
-            const age = document.getElementById('inputAge').value;
-            
-            if (!name || !age) {
-                showToast("Inserisci il tuo Nome e la tua Età per generare il ritratto.", "error");
-                return;
-            }
-            if (!uploadedImage) {
-                showToast("Carica un selfie prima di generare l'opera.", "error");
-                return;
-            }
-            
-            isGenerated = true;
-            drawPortraitCanvas();
-            
-            // Su mobile scorre giù in automatico all'immagine generata
-            if (window.innerWidth < 1024) {
-                document.getElementById('portraitCanvas').scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
+    // --- Inizializzazione Interfaccia Domande ---
+    function initQuestions() {
+      const container = document.getElementById("questionsContainer");
+      container.innerHTML = "";
+      QUESTIONS_DATA.forEach((q, index) => {
+        const row = document.createElement("div");
+        row.className = "py-3 flex items-center justify-between gap-4 cursor-pointer select-none";
+        row.onclick = (e) => {
+          if (e.target.tagName !== 'INPUT') {
+            const cb = document.getElementById(`q_toggle_${index}`);
+            cb.checked = !cb.checked;
+            updateToggleLabel(index);
+          }
         };
 
-        function drawPortraitCanvas() {
-            const cvs = document.getElementById('portraitCanvas');
-            if (!cvs) return;
-            const ctx = cvs.getContext('2d');
+        row.innerHTML = `
+          <span class="text-xs sm:text-sm text-slate-300 flex-1 leading-snug">${index + 1}. ${q.text}</span>
+          <div class="relative inline-block w-12 align-middle select-none transition duration-200 ease-in flex-shrink-0">
+            <input type="checkbox" id="q_toggle_${index}" onchange="updateToggleLabel(${index})" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 border-slate-700 appearance-none cursor-pointer transition-all duration-200"/>
+            <label for="q_toggle_${index}" class="toggle-label block overflow-hidden h-6 rounded-full bg-slate-700 cursor-pointer flex items-center justify-between px-1.5 text-[9px] font-bold text-slate-400 uppercase">
+              <span id="label_no_${index}">NO</span>
+              <span id="label_si_${index}" class="hidden text-slate-950">SÌ</span>
+            </label>
+          </div>
+        `;
+        container.appendChild(row);
+      });
+    }
 
-            const width = cvs.width;   // 900
-            const height = cvs.height; // 1200
+    function updateToggleLabel(index) {
+      const cb = document.getElementById(`q_toggle_${index}`);
+      const noSpan = document.getElementById(`label_no_${index}`);
+      const siSpan = document.getElementById(`label_si_${index}`);
+      if (cb.checked) {
+        noSpan.classList.add("hidden");
+        siSpan.classList.remove("hidden");
+      } else {
+        noSpan.classList.remove("hidden");
+        siSpan.classList.add("hidden");
+      }
+    }
 
-            ctx.clearRect(0, 0, width, height);
-
-            // 1. Sfondo o Immagine Caricata
-            if (uploadedImage) {
-                // Copertura Aspect Ratio Fill
-                const scale = Math.max(width / uploadedImage.width, height / uploadedImage.height);
-                const x = (width / 2) - (uploadedImage.width / 2) * scale;
-                const y = (height / 2) - (uploadedImage.height / 2) * scale;
-                ctx.drawImage(uploadedImage, x, y, uploadedImage.width * scale, uploadedImage.height * scale);
-            } else {
-                // Sfondo Segnaposto Grigio Neutro con effetto gradiente
-                const grad = ctx.createLinearGradient(0, 0, width, height);
-                grad.addColorStop(0, '#1e293b');
-                grad.addColorStop(1, '#0f172a');
-                ctx.fillStyle = grad;
-                ctx.fillRect(0, 0, width, height);
-
-                // Silhouette segnaposto minimalista
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-                ctx.beginPath();
-                ctx.arc(width / 2, height / 2 - 80, 180, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.beginPath();
-                ctx.arc(width / 2, height + 200, 420, 0, Math.PI * 2);
-                ctx.fill();
-
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-                ctx.font = '500 24px Inter, sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText('Carica il tuo selfie per completare l\'opera', width / 2, height / 2 + 160);
-            }
-
-            // Se non è ancora stato cliccato il tasto "Genera", fermiamo il disegno qui
-            if (!isGenerated) return;
-
-            // 2. Disegno Griglia 4x4 (Quadrati pieni contigui senza spazi)
-            const rawAge = document.getElementById('inputAge').value || '60';
-            const color = getColorForAge(rawAge);
-
-            // Dimensione griglia centrata
-            const gridWidth = 480; 
-            const gridHeight = 480;
-            const startX = (width - gridWidth) / 2;
-            const startY = (height - gridHeight) / 2;
-            const sz = gridWidth / 4; // 120px per quadrato
-
-            for (let i = 0; i < 16; i++) {
-                if (userAnswers[i] === true) {
-                    const r = Math.floor(i / 4);
-                    const c = i % 4;
-                    ctx.fillStyle = color;
-                    // +0.8 per prevenire fessure tra i quadrati dovute all'anti-aliasing
-                    ctx.fillRect(
-                        Math.floor(startX + c * sz), 
-                        Math.floor(startY + r * sz), 
-                        Math.ceil(sz) + 0.8, 
-                        Math.ceil(sz) + 0.8
-                    );
-                }
-            }
-
-            // 3. Parole Chiave in alto (Estrapolate in modo DINAMICO e CASUALE dalle risposte SÌ)
-            let activeKeywords = [];
-            userAnswers.forEach((isYes, i) => {
-                if (isYes) activeKeywords.push(KEYWORDS_MAP[i]);
-            });
-            
-            // Mescoliamo le parole chiave in modo casuale così ad ogni "Genera" cambia la combinazione
-            activeKeywords.sort(() => 0.5 - Math.random());
-            
-            // Estraiamo le prime 4 (ora mescolate)
-            let top4 = activeKeywords.slice(0, 4);
-            
-            // Se l'utente ha selezionato meno di 4 SÌ, usiamo delle parole di riserva casuali
-            const fallbackKeywords = ["ESPERIENZA", "FUTURO", "VITA", "VALORI", "TEMPO", "MEMORIA"];
-            fallbackKeywords.sort(() => 0.5 - Math.random()); // Mescoliamo anche le riserve
-            let fallbackIndex = 0;
-            
-            while (top4.length < 4 && fallbackIndex < fallbackKeywords.length) {
-                // Aggiungiamo la parola di riserva solo se non è già presente
-                if (!top4.includes(fallbackKeywords[fallbackIndex])) {
-                    top4.push(fallbackKeywords[fallbackIndex]);
-                }
-                fallbackIndex++;
-            }
-
-            const keywordsText = top4.join(" • ");
-            document.getElementById('keywordsDisplay').innerText = keywordsText;
-
-            // Disegno Parole Chiave in Alto sul Canvas (Allineate ed Equidistanti)
-            ctx.fillStyle = "#ffffff";
-            ctx.shadowColor = "rgba(0,0,0,0.6)";
-            ctx.shadowBlur = 8;
-            ctx.font = "700 22px Arial, sans-serif";
-            
-            const leftEdge = 60; // Inizio del Nome
-            const rightEdge = width - 60; // Fine dell'Età
-            const totalAvailableWidth = rightEdge - leftEdge;
-            
-            // Calcola la larghezza totale del testo per trovare lo spazio vuoto
-            let totalWordsWidth = 0;
-            const kwWidths = top4.map(kw => {
-                const w = ctx.measureText(kw).width;
-                totalWordsWidth += w;
-                return w;
-            });
-            
-            // Calcola lo spazio di separazione (gap) tra una parola e l'altra
-            const gap = top4.length > 1 ? (totalAvailableWidth - totalWordsWidth) / (top4.length - 1) : 0;
-            
-            // Disegna ogni parola da sinistra verso destra
-            let currentKwX = leftEdge;
-            ctx.textAlign = "left"; 
-            top4.forEach((kw, idx) => {
-                ctx.fillText(kw, currentKwX, 70);
-                currentKwX += kwWidths[idx] + gap;
-            });
-
-            // 4. Nome Tipografico in basso a sinistra
-            const rawName = (document.getElementById('inputName').value || 'NOME').toUpperCase().trim();
-            const nameX = leftEdge;
-            const nameY = height - 70;
-
-            ctx.shadowColor = "rgba(0,0,0,0.8)";
-            ctx.shadowBlur = 10;
-            ctx.textAlign = "left";
-
-            let currentX = nameX;
-            for (let idx = 0; idx < rawName.length; idx++) {
-                const char = rawName[idx];
-                
-                if (idx === 2) {
-                    // Terza Lettera: Arial corsivo (stessa grandezza)
-                    ctx.font = "italic 700 58px Arial, sans-serif";
-                    ctx.fillStyle = color; // Colore dell'età
-                } else {
-                    // Altre lettere: Arial normale
-                    ctx.font = "700 58px Arial, sans-serif";
-                    ctx.fillStyle = "#ffffff";
-                }
-
-                ctx.fillText(char, currentX, nameY);
-                currentX += ctx.measureText(char).width;
-            }
-
-            // 5. Età in basso a destra ("ANNI: 60")
-            ctx.font = "700 58px Arial, sans-serif";
-            const ageNumberWidth = ctx.measureText(rawAge).width;
-            
-            // Disegniamo la scritta "ANNI:" della stessa grandezza (58px) in bianco
-            ctx.fillStyle = "#ffffff";
-            ctx.textAlign = "right";
-            ctx.fillText("ANNI:", rightEdge - ageNumberWidth - 15, nameY);
-
-            // Disegniamo il numero dell'età in colore fascia d'età (58px)
-            ctx.fillStyle = color;
-            ctx.fillText(rawAge, rightEdge, nameY); 
-
-            // Reset shadow
-            ctx.shadowBlur = 0;
-        }
-
-        window.downloadPortrait = function() {
-            const cvs = document.getElementById('portraitCanvas');
-            if (!cvs) return;
-            const name = (document.getElementById('inputName').value || 'Partecipante').trim();
-            
-            const link = document.createElement('a');
-            link.download = `Ritratto_Mostra_${name}.png`;
-            link.href = cvs.toDataURL('image/png');
-            link.click();
-            
-            showToast("Ritratto scaricato con successo!", "success");
+    // --- Gestione Caricamento Foto ---
+    function handleImageUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          loadedUserImage = img;
+          drawInitialPreview();
         };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
 
-        window.shareToInstagram = function() {
-            const cvs = document.getElementById('portraitCanvas');
-            if (!cvs) return;
+    function drawInitialPreview() {
+      const canvas = document.getElementById("portraitCanvas");
+      const ctx = canvas.getContext("2d");
+      document.getElementById("placeholderText").classList.add("hidden");
 
-            cvs.toBlob((blob) => {
-                const file = new File([blob], 'ritratto_mostra.png', { type: 'image/png' });
-                if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                    navigator.share({
-                        files: [file],
-                        title: 'Il mio Ritratto Generazionale',
-                        text: 'Guarda la mia tessera risposte per la Mostra sulla Longevità!'
-                    }).catch(() => {
-                        downloadPortrait();
-                    });
-                } else {
-                    downloadPortrait();
-                    showToast("Immagine salvata nei Download! Apri Instagram e selezionala nelle Storie.", "info");
-                }
-            });
-        };
+      ctx.clearRect(0, 0, 1080, 1440);
+      if (loadedUserImage) {
+        drawImageCover(ctx, loadedUserImage, 0, 0, 1080, 1440);
+      }
+    }
 
-        window.sendSubmissionToDatabase = async function() {
-            const btn = document.getElementById('sendToExhibitionBtn');
-            const name = (document.getElementById('inputName').value || 'Anonimo').trim();
-            const age = parseInt(document.getElementById('inputAge').value, 10) || 60;
+    function drawImageCover(ctx, img, x, y, w, h) {
+      const imgRatio = img.width / img.height;
+      const canvasRatio = w / h;
+      let sWidth, sHeight, sx, sy;
 
-            btn.disabled = true;
-            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Invio in corso...`;
+      if (imgRatio > canvasRatio) {
+        sHeight = img.height;
+        sWidth = img.height * canvasRatio;
+        sx = (img.width - sWidth) / 2;
+        sy = 0;
+      } else {
+        sWidth = img.width;
+        sHeight = img.width / canvasRatio;
+        sx = 0;
+        sy = (img.height - sHeight) / 2;
+      }
+      ctx.drawImage(img, sx, sy, sWidth, sHeight, x, y, w, h);
+    }
 
-            const docId = currentUser?.uid ? currentUser.uid : 'user_' + Date.now();
-            
-            // Catturiamo ESATTAMENTE le 4 parole chiave che sono state generate a schermo in quel momento
-            const displayedKeywordsText = document.getElementById('keywordsDisplay').innerText;
-            const finalKeywords = displayedKeywordsText ? displayedKeywordsText.split(' • ') : [];
+    // --- Generazione Ritratto Finale (Layout Esatto come Foto di Riferimento) ---
+    function generatePortrait() {
+      const name = document.getElementById("inputName").value.trim() || "NOME";
+      const ageVal = document.getElementById("inputAge").value.trim() || "0";
+      const age = parseInt(ageVal, 10) || 0;
+      const themeColor = getColorForAge(age);
 
-            const payload = {
-                nome: name,
-                eta: age,
-                answers: userAnswers,
-                keywords: finalKeywords,
-                timestamp: new Date().toISOString()
-            };
-
-            try {
-                if (db) {
-                    const subRef = doc(db, 'artifacts', appId, 'public', 'data', 'submissions', docId);
-                    await setDoc(subRef, payload);
-                }
-                showToast("✅ Risposte inviate con successo alla mostra!", "success");
-                btn.innerHTML = `<i class="fa-solid fa-check"></i> Risposta Già Inviata`;
-                btn.className = "w-full py-2.5 px-4 bg-slate-800 text-slate-400 font-semibold rounded-xl cursor-not-allowed border border-slate-700 text-xs";
-            } catch (err) {
-                console.error("Errore salvataggio:", err);
-                showToast("Risposte salvate in locale!", "success");
-                btn.innerHTML = `<i class="fa-solid fa-check"></i> Inviato Locale`;
-            }
-        };
-
-        function listenToSubmissions() {
-            if (!db) return;
-            try {
-                const subsCol = collection(db, 'artifacts', appId, 'public', 'data', 'submissions');
-                onSnapshot(subsCol, (snapshot) => {
-                    allSubmissions = [];
-                    snapshot.forEach(docSnap => {
-                        allSubmissions.push({ id: docSnap.id, ...docSnap.data() });
-                    });
-                    renderAllStatistics();
-                }, (err) => {
-                    console.warn("Snapshot error:", err);
-                });
-            } catch (err) {
-                console.warn("Listen failed:", err);
-            }
+      // Raccolta risposte
+      const responses = [];
+      const activeKeywords = [];
+      for (let i = 0; i < 16; i++) {
+        const isChecked = document.getElementById(`q_toggle_${i}`).checked;
+        responses.push(isChecked);
+        if (isChecked) {
+          activeKeywords.push(QUESTIONS_DATA[i].keyword);
         }
+      }
 
-        function renderAllStatistics() {
-            const total = allSubmissions.length;
-            document.getElementById('statTotalSubmissions').innerText = total;
+      // Selezione 3 parole chiave per l'intestazione superiore
+      let pool = [...activeKeywords].sort(() => 0.5 - Math.random());
+      let backupPool = [...BACKUP_KEYWORDS].sort(() => 0.5 - Math.random());
+      while (pool.length < 3) {
+        pool.push(backupPool.pop() || "VALORE");
+      }
+      currentSelectedKeywords = pool.slice(0, 3);
 
-            if (total === 0) {
-                document.getElementById('statAverageAge').innerText = "--";
-                document.getElementById('statTopCategory').innerText = "--";
-                renderQuestionsStats([]);
-                renderAgeArchetypes([]);
-                renderMosaicTiles([]);
-                return;
-            }
+      // Rendering su Canvas 1080x1440 (3:4)
+      const canvas = document.getElementById("portraitCanvas");
+      const ctx = canvas.getContext("2d");
+      document.getElementById("placeholderText").classList.add("hidden");
 
-            // Calcolo Età Media
-            const sumAge = allSubmissions.reduce((acc, curr) => acc + (parseInt(curr.eta, 10) || 0), 0);
-            const avgAge = Math.round(sumAge / total);
-            document.getElementById('statAverageAge').innerText = `${avgAge} anni`;
+      ctx.clearRect(0, 0, 1080, 1440);
 
-            // Parola chiave più usata
-            const kwCounts = {};
-            allSubmissions.forEach(sub => {
-                if (sub.keywords) {
-                    sub.keywords.forEach(kw => kwCounts[kw] = (kwCounts[kw] || 0) + 1);
-                }
-            });
-            let topKw = "--";
-            let maxCount = 0;
-            Object.entries(kwCounts).forEach(([kw, count]) => {
-                if (count > maxCount) {
-                    maxCount = count;
-                    topKw = kw;
-                }
-            });
-            document.getElementById('statTopCategory').innerText = topKw;
+      // 1. Sfondo Foto
+      if (loadedUserImage) {
+        drawImageCover(ctx, loadedUserImage, 0, 0, 1080, 1440);
+      } else {
+        ctx.fillStyle = "#1e293b";
+        ctx.fillRect(0, 0, 1080, 1440);
+      }
 
-            renderQuestionsStats(allSubmissions);
-            renderAgeArchetypes(allSubmissions);
-            renderMosaicTiles(allSubmissions);
-            renderOrganizerTable(allSubmissions);
+      // 2. Griglia 4x4 CENTRATA (Dimensione 648x648 px, ogni cella 162x162 px)
+      const gridSize = 648;
+      const cellSize = gridSize / 4; // 162px
+      const gridOriginX = (1080 - gridSize) / 2; // Centrata a 216px
+      const gridOriginY = 370; // Posizionata sull'area del volto
+
+      ctx.fillStyle = themeColor;
+      for (let row = 0; row < 4; row++) {
+        for (let col = 0; col < 4; col++) {
+          const index = row * 4 + col;
+          if (responses[index]) {
+            ctx.fillRect(
+              gridOriginX + (col * cellSize),
+              gridOriginY + (row * cellSize),
+              cellSize,
+              cellSize
+            );
+          }
         }
+      }
 
-        function renderQuestionsStats(submissions) {
-            const container = document.getElementById('questionsStatsList');
-            if (!container) return;
-            container.innerHTML = '';
+      // 3. Parole Chiave in Alto
+      const topMargin = 60;
+      const leftMargin = 65;
+      const rightMargin = 1015;
 
-            const total = submissions.length || 1;
+      ctx.font = "bold 26px Arial";
+      ctx.textBaseline = "top";
 
-            QUESTIONS.forEach((qText, idx) => {
-                const yesCount = submissions.filter(s => s.answers && s.answers[idx] === true).length;
-                const pct = Math.round((yesCount / total) * 100);
+      // Parola 1 (Sinistra - Bianca)
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "left";
+      ctx.fillText(currentSelectedKeywords[0], leftMargin, topMargin);
 
-                const item = document.createElement('div');
-                item.className = 'p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-1.5';
-                item.innerHTML = `
-                    <div class="flex items-center justify-between text-xs">
-                        <span class="text-slate-300 font-medium truncate pr-2"><strong class="text-amber-400">${idx + 1}.</strong> ${qText}</span>
-                        <span class="font-bold text-amber-300">${pct}%</span>
-                    </div>
-                    <div class="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
-                        <div class="bg-gradient-to-r from-amber-500 to-rose-500 h-full rounded-full transition-all duration-500" style="width: ${pct}%"></div>
-                    </div>
-                `;
-                container.appendChild(item);
-            });
+      // Parola 2 (Centro - Bianca)
+      ctx.textAlign = "center";
+      ctx.fillText(currentSelectedKeywords[1], 1080 / 2, topMargin);
+
+      // Parola 3 (Destra - Colore del Tema)
+      ctx.fillStyle = themeColor;
+      ctx.textAlign = "right";
+      ctx.fillText(currentSelectedKeywords[2], rightMargin, topMargin);
+
+      // 4. Riga Inferiore: Nome a Sinistra, ANNI al Centro-Destra, Età a Destra
+      const bottomY = 1380;
+      ctx.textBaseline = "alphabetic";
+
+      // Nome a sinistra (tutto con colore a tema, 3ª lettera in corsivo)
+      let cursorX = leftMargin;
+      for (let i = 0; i < name.length; i++) {
+        const char = name[i];
+        if (i === 2) {
+          ctx.font = "italic bold 58px Arial";
+        } else {
+          ctx.font = "bold 58px Arial";
         }
+        ctx.fillStyle = themeColor;
+        ctx.textAlign = "left";
+        ctx.fillText(char, cursorX, bottomY);
+        cursorX += ctx.measureText(char).width + 2;
+      }
 
-        function renderAgeArchetypes(submissions) {
-            const container = document.getElementById('ageArchetypesContainer');
-            if (!container) return;
-            container.innerHTML = '';
+      // "ANNI:" prima del numero
+      ctx.font = "bold 58px Arial";
+      ctx.fillStyle = themeColor;
+      ctx.textAlign = "right";
+      ctx.fillText("ANNI:", 740, bottomY);
 
-            const ageGroups = [
-                { label: '18 - 35 Anni', filter: (a) => a <= 35, defaultAge: 25 },
-                { label: '36 - 50 Anni', filter: (a) => a >= 36 && a <= 50, defaultAge: 40 },
-                { label: '51 - 75 Anni', filter: (a) => a >= 51 && a <= 75, defaultAge: 60 },
-                { label: '76 - 85 Anni', filter: (a) => a >= 76 && a <= 85, defaultAge: 80 },
-                { label: 'Over 85 Anni', filter: (a) => a > 85, defaultAge: 90 }
-            ];
+      // Numero Età allineato al margine destro
+      const ageString = age > 0 ? `${age}` : "";
+      ctx.fillText(ageString, rightMargin, bottomY);
 
-            ageGroups.forEach(grp => {
-                const groupSubs = submissions.filter(s => grp.filter(parseInt(s.eta, 10) || 0));
-                const color = getColorForAge(grp.defaultAge);
+      // Abilita bottoni
+      document.getElementById("btnDownloadPortrait").disabled = false;
+      document.getElementById("btnSubmitExhibition").disabled = false;
+    }
 
-                const card = document.createElement('div');
-                card.className = 'bg-slate-900/90 p-4 rounded-xl border border-slate-800 flex flex-col items-center gap-3 shadow-lg';
+    // --- Download Immagine Ritratto Finale ---
+    function downloadPortraitImage() {
+      const canvas = document.getElementById("portraitCanvas");
+      const name = document.getElementById("inputName").value.trim() || "ritratto";
+      const link = document.createElement("a");
+      link.download = `ritratto_${name.toLowerCase()}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    }
 
-                // Canvas per matrice archetipo
-                const cvs = document.createElement('canvas');
-                cvs.width = 240;
-                cvs.height = 240;
-                cvs.className = 'rounded-lg bg-slate-950 border border-slate-800 shadow-inner';
+    // --- Invio Dati alla Mostra ---
+    async function submitToExhibition() {
+      const btn = document.getElementById("btnSubmitExhibition");
+      btn.disabled = true;
+      btn.textContent = "⏳ Invio in corso...";
 
-                const ctx = cvs.getContext('2d');
-                ctx.clearRect(0, 0, 240, 240);
-                const sz = 240 / 4;
+      const name = document.getElementById("inputName").value.trim() || "Anonimo";
+      const age = parseInt(document.getElementById("inputAge").value.trim(), 10) || 0;
+      const responses = [];
+      for (let i = 0; i < 16; i++) {
+        responses.push(document.getElementById(`q_toggle_${i}`).checked);
+      }
 
-                const groupTotal = groupSubs.length || 1;
-                const archetypeAnswers = [];
+      const record = {
+        name,
+        age,
+        responses,
+        keywords: currentSelectedKeywords,
+        timestamp: new Date().toISOString()
+      };
 
-                for (let i = 0; i < 16; i++) {
-                    const yesCount = groupSubs.filter(s => s.answers && s.answers[i] === true).length;
-                    const isMajority = (yesCount / groupTotal) >= 0.5;
-                    archetypeAnswers.push(isMajority);
-
-                    if (isMajority) {
-                        const r = Math.floor(i / 4);
-                        const c = i % 4;
-                        ctx.fillStyle = color;
-                        ctx.fillRect(c * sz, r * sz, sz, sz);
-                    }
-                }
-
-                const title = document.createElement('div');
-                title.className = 'text-center';
-                title.innerHTML = `
-                    <div class="font-bold text-slate-200 text-sm">${grp.label}</div>
-                    <div class="text-xs text-slate-400">${groupSubs.length} partecipanti</div>
-                `;
-
-                const btn = document.createElement('button');
-                btn.className = 'px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-semibold rounded-lg border border-slate-700 transition flex items-center gap-1.5';
-                btn.innerHTML = '<i class="fa-solid fa-download"></i> Matrice PNG';
-                btn.onclick = () => downloadCrudeMatrixPNG(`Archetipo_${grp.label.replace(/\s+/g, '_')}`, archetypeAnswers, color);
-
-                card.appendChild(cvs);
-                card.appendChild(title);
-                card.appendChild(btn);
-                container.appendChild(card);
-            });
+      try {
+        if (db) {
+          await db.collection("mostra_risposte").add(record);
+        } else {
+          const localData = JSON.parse(localStorage.getItem("mostra_risposte_local") || "[]");
+          localData.push(record);
+          localStorage.setItem("mostra_risposte_local", JSON.stringify(localData));
         }
+        btn.textContent = "✅ Risposte Inviate con Successo!";
+        btn.classList.remove("bg-emerald-600");
+        btn.classList.add("bg-slate-700");
+      } catch (err) {
+        console.error("Errore invio:", err);
+        btn.textContent = "✅ Salvato!";
+      }
+    }
 
-        function renderMosaicTiles(submissions, filterKey = 'all') {
-            const container = document.getElementById('mosaicTilesContainer');
-            if (!container) return;
-            container.innerHTML = '';
+    // --- Area Riservata Curatore (Hash wittoria56@) ---
+    function openAdminModal() {
+      document.getElementById("adminModal").classList.remove("hidden");
+    }
+    function closeAdminModal() {
+      document.getElementById("adminModal").classList.add("hidden");
+    }
 
-            let filtered = submissions;
-            if (filterKey === '18-35') filtered = submissions.filter(s => (parseInt(s.eta, 10) || 0) <= 35);
-            if (filterKey === '36-50') filtered = submissions.filter(s => (parseInt(s.eta, 10) || 0) >= 36 && (parseInt(s.eta, 10) || 0) <= 50);
-            if (filterKey === '51-75') filtered = submissions.filter(s => (parseInt(s.eta, 10) || 0) >= 51 && (parseInt(s.eta, 10) || 0) <= 75);
-            if (filterKey === '76-85') filtered = submissions.filter(s => (parseInt(s.eta, 10) || 0) >= 76 && (parseInt(s.eta, 10) || 0) <= 85);
-            if (filterKey === '85plus') filtered = submissions.filter(s => (parseInt(s.eta, 10) || 0) > 85);
+    async function sha256(message) {
+      const msgBuffer = new TextEncoder().encode(message);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
 
-            if (!filtered || filtered.length === 0) {
-                container.innerHTML = '<div class="col-span-full text-center text-slate-400 py-8">Nessun partecipante presente per questo filtro.</div>';
-                return;
-            }
+    async function verifyAdminPassword() {
+      const input = document.getElementById("adminPasswordInput").value;
+      const errorMsg = document.getElementById("adminAuthError");
+      const targetHash = "21566cf7e4c38d172e92c21aa5c31f4ba4025b5974052829ff851218bbad5106"; // wittoria56@
 
-            filtered.forEach((sub) => {
-                const color = getColorForAge(sub.eta);
+      const inputHash = await sha256(input);
+      if (inputHash === targetHash) {
+        errorMsg.classList.add("hidden");
+        document.getElementById("adminAuthSection").classList.add("hidden");
+        document.getElementById("adminDashboardSection").classList.remove("hidden");
+        loadAdminRecords();
+      } else {
+        errorMsg.classList.remove("hidden");
+      }
+    }
 
-                const tileCard = document.createElement('div');
-                tileCard.className = 'bg-slate-800/60 p-3 rounded-xl border border-slate-700/50 flex flex-col items-center gap-2 hover:border-slate-500 transition shadow-lg';
-
-                const cvs = document.createElement('canvas');
-                cvs.width = 160;
-                cvs.height = 160;
-                cvs.className = 'rounded-lg bg-slate-900 border border-slate-800 cursor-pointer shadow-inner';
-                cvs.title = 'Clicca per scaricare la tessera PNG trasparente';
-
-                const cCtx = cvs.getContext('2d');
-                cCtx.clearRect(0, 0, 160, 160);
-                const sz = 160 / 4;
-
-                for (let i = 0; i < 16; i++) {
-                    if (sub.answers && sub.answers[i] === true) {
-                        const r = Math.floor(i / 4);
-                        const c = i % 4;
-                        cCtx.fillStyle = color;
-                        cCtx.fillRect(c * sz, r * sz, sz, sz);
-                    }
-                }
-
-                cvs.addEventListener('click', () => downloadSingleParticipantTile(sub, color));
-
-                const label = document.createElement('div');
-                label.className = 'text-center';
-                label.innerHTML = `
-                    <div class="font-bold text-slate-200 text-xs truncate max-w-[120px]">${escapeHtml(sub.nome || 'Partecipante')}</div>
-                    <div class="text-[11px] text-slate-400">${sub.eta ? sub.eta + ' anni' : ''}</div>
-                `;
-
-                tileCard.appendChild(cvs);
-                tileCard.appendChild(label);
-                container.appendChild(tileCard);
-            });
+    async function loadAdminRecords() {
+      const container = document.getElementById("adminRecordsList");
+      let list = [];
+      if (db) {
+        try {
+          const snap = await db.collection("mostra_risposte").orderBy("timestamp", "desc").get();
+          snap.forEach(doc => list.push(doc.data()));
+        } catch(e) {
+          list = JSON.parse(localStorage.getItem("mostra_risposte_local") || "[]");
         }
+      } else {
+        list = JSON.parse(localStorage.getItem("mostra_risposte_local") || "[]");
+      }
 
-        // Scarica la tessera CRUDA in PNG Trasparente (Senza sfondi, senza griglie)
-        window.downloadSingleParticipantTile = function(sub, color) {
-            downloadCrudeMatrixPNG(`Tessera_Cruda_${sub.nome || 'Utente'}_${sub.eta || 'Anni'}`, sub.answers, color);
-        };
+      if (list.length === 0) {
+        container.innerHTML = "Nessun partecipante registrato al momento.";
+        return;
+      }
 
-        function downloadCrudeMatrixPNG(filename, answersArray, color) {
-            const tmpCanvas = document.createElement('canvas');
-            tmpCanvas.width = 800;
-            tmpCanvas.height = 800;
-            const tCtx = tmpCanvas.getContext('2d');
+      container.innerHTML = list.map((item) => `
+        <div class="py-1 border-b border-slate-800/80 flex justify-between">
+          <span><strong>${item.name}</strong> (${item.age} anni)</span>
+          <span class="text-slate-500">${item.responses.filter(Boolean).length}/16 SÌ</span>
+        </div>
+      `).join("");
+    }
 
-            // SFONDO TRASPARENTE COMPLETO
-            tCtx.clearRect(0, 0, 800, 800);
-
-            const sz = 800 / 4; // 200px per quadrato
-
-            for (let i = 0; i < 16; i++) {
-                if (answersArray && answersArray[i] === true) {
-                    const r = Math.floor(i / 4);
-                    const c = i % 4;
-                    tCtx.fillStyle = color;
-                    // Disegna unicamente il blocco del SÌ
-                    tCtx.fillRect(c * sz, r * sz, sz, sz);
-                }
-            }
-
-            const link = document.createElement('a');
-            link.download = `${filename}.png`;
-            link.href = tmpCanvas.toDataURL('image/png');
-            link.click();
-            showToast(`Tessera PNG trasparente scaricata!`, "success");
+    // --- Esportazione CSV per Excel ---
+    async function exportCSV() {
+      let list = [];
+      if (db) {
+        try {
+          const snap = await db.collection("mostra_risposte").get();
+          snap.forEach(doc => list.push(doc.data()));
+        } catch(e) {
+          list = JSON.parse(localStorage.getItem("mostra_risposte_local") || "[]");
         }
+      } else {
+        list = JSON.parse(localStorage.getItem("mostra_risposte_local") || "[]");
+      }
 
-        window.switchTab = function(tabName) {
-            const partView = document.getElementById('participateView');
-            const statsView = document.getElementById('statsView');
-            const btnPart = document.getElementById('tabParticipateBtn');
-            const btnStats = document.getElementById('tabStatsBtn');
+      let csv = "Nome,Eta,Data," + QUESTIONS_DATA.map((q, i) => `D${i+1}_${q.keyword}`).join(",") + "\n";
+      list.forEach(r => {
+        const respCols = r.responses.map(res => res ? "SI" : "NO").join(",");
+        csv += `"${r.name}",${r.age},"${r.timestamp}",${respCols}\n`;
+      });
 
-            if (tabName === 'participate') {
-                partView.classList.remove('hidden');
-                statsView.classList.add('hidden');
-                
-                btnPart.className = "px-3 py-1.5 rounded-lg font-medium transition bg-amber-500 text-slate-950 font-semibold shadow";
-                btnStats.className = "px-3 py-1.5 rounded-lg font-medium transition text-slate-300 hover:text-white";
-            } else {
-                partView.classList.add('hidden');
-                statsView.classList.remove('hidden');
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "dati_mostra_anzianita.csv";
+      link.click();
+    }
 
-                btnStats.className = "px-3 py-1.5 rounded-lg font-medium transition bg-amber-500 text-slate-950 font-semibold shadow";
-                btnPart.className = "px-3 py-1.5 rounded-lg font-medium transition text-slate-300 hover:text-white";
-            }
-        };
+    // --- Matrice Archetipo "Cruda" in PNG Trasparente (800x800) ---
+    function downloadAgeArchetypePNG() {
+      const ageVal = prompt("Inserisci l'età per cui calcolare la matrice (es. 70):", "70");
+      const age = parseInt(ageVal, 10) || 50;
+      const color = getColorForAge(age);
 
-        // Filtri Tessere Mosaico
-        document.querySelectorAll('.mosaic-filter-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                document.querySelectorAll('.mosaic-filter-btn').forEach(b => {
-                    b.classList.remove('bg-amber-500', 'text-slate-950', 'font-bold');
-                    b.classList.add('bg-slate-800', 'text-slate-300');
-                });
-                const target = e.currentTarget;
-                target.classList.remove('bg-slate-800', 'text-slate-300');
-                target.classList.add('bg-amber-500', 'text-slate-950', 'font-bold');
+      let list = JSON.parse(localStorage.getItem("mostra_risposte_local") || "[]");
+      
+      const offscreenCanvas = document.createElement("canvas");
+      offscreenCanvas.width = 800;
+      offscreenCanvas.height = 800;
+      const ctx = offscreenCanvas.getContext("2d");
 
-                const filter = target.getAttribute('data-filter');
-                renderMosaicTiles(allSubmissions, filter);
-            });
-        });
+      ctx.clearRect(0, 0, 800, 800);
+      ctx.fillStyle = color;
+      const cellSize = 800 / 4;
 
-        window.openOrganizerModal = function() {
-            document.getElementById('organizerModal').classList.remove('hidden');
-        };
-
-        window.closeOrganizerModal = function() {
-            document.getElementById('organizerModal').classList.add('hidden');
-        };
-
-        window.verifyOrganizerPin = async function() {
-            const pinVal = document.getElementById('inputOrganizerPin').value;
-            const inputHash = await computeSHA256(pinVal);
-            
-            if (inputHash === targetHashHex) {
-                isOrganizerAuthenticated = true;
-                document.getElementById('pinAuthForm').classList.add('hidden');
-                document.getElementById('organizerContent').classList.remove('hidden');
-                showToast("Accesso Area Riservata effettuato", "success");
-                document.getElementById('inputOrganizerPin').value = ''; // Pulisce il campo password
-            } else {
-                showToast("Password errata. Riprova.", "error");
-            }
-        };
-
-        function renderOrganizerTable(submissions) {
-            const tbody = document.getElementById('organizerTableBody');
-            if (!tbody) return;
-            tbody.innerHTML = '';
-
-            submissions.forEach(s => {
-                const tr = document.createElement('tr');
-                const yesCount = s.answers ? s.answers.filter(Boolean).length : 0;
-                const kwStr = s.keywords ? s.keywords.join(', ') : '-';
-                const dateStr = s.timestamp ? new Date(s.timestamp).toLocaleString('it-IT') : '-';
-
-                tr.innerHTML = `
-                    <td class="p-2.5 font-bold">${escapeHtml(s.nome || 'Anonimo')}</td>
-                    <td class="p-2.5">${s.eta || '-'}</td>
-                    <td class="p-2.5"><span class="px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded">${yesCount} / 16</span></td>
-                    <td class="p-2.5 text-slate-400">${kwStr}</td>
-                    <td class="p-2.5 text-slate-500">${dateStr}</td>
-                `;
-                tbody.appendChild(tr);
-            });
+      for (let r = 0; r < 4; r++) {
+        for (let c = 0; c < 4; c++) {
+          const idx = r * 4 + c;
+          const yesCount = list.filter(item => item.responses && item.responses[idx]).length;
+          const shouldFill = list.length > 0 ? (yesCount / list.length >= 0.5) : (idx % 2 === 0);
+          
+          if (shouldFill) {
+            ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
+          }
         }
+      }
 
-        // Esportazione CSV
-        window.exportSubmissionsCSV = function() {
-            if (allSubmissions.length === 0) {
-                showToast("Nessun dato presente da esportare", "error");
-                return;
-            }
+      const link = document.createElement("a");
+      link.download = `matrice_trasparente_eta_${age}.png`;
+      link.href = offscreenCanvas.toDataURL("image/png");
+      link.click();
+    }
 
-            let csvContent = "data:text/csv;charset=utf-8,";
-            csvContent += "Nome;Eta;TotaleSi;" + QUESTIONS.map((_, i) => `D${i+1}`).join(";") + ";ParoleChiave;DataInvio\n";
-
-            allSubmissions.forEach(s => {
-                const yesCount = s.answers ? s.answers.filter(Boolean).length : 0;
-                const answersCols = QUESTIONS.map((_, i) => (s.answers && s.answers[i]) ? "SI" : "NO").join(";");
-                const kwStr = s.keywords ? s.keywords.join(",") : "";
-                
-                csvContent += `"${s.nome || ''}";"${s.eta || ''}";${yesCount};${answersCols};"${kwStr}";"${s.timestamp || ''}"\n`;
-            });
-
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "Risposte_Mostra_Anzianita.csv");
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
-            showToast("File CSV esportato per Excel!", "success");
-        };
-
-        // Esportazione JSON
-        window.exportSubmissionsJSON = function() {
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(allSubmissions, null, 2));
-            const dlAnchorElem = document.createElement('a');
-            dlAnchorElem.setAttribute("href", dataStr);
-            dlAnchorElem.setAttribute("download", "Dataset_Mostra.json");
-            dlAnchorElem.click();
-            showToast("Dataset JSON esportato!", "success");
-        };
-
-        // Utility Toast
-        function showToast(message, type = "info") {
-            const container = document.getElementById('toastContainer');
-            if (!container) return;
-
-            const toast = document.createElement('div');
-            let bg = "bg-slate-800 text-white border-slate-700";
-            if (type === "success") bg = "bg-emerald-600 text-white border-emerald-500";
-            if (type === "error") bg = "bg-rose-600 text-white border-rose-500";
-
-            toast.className = `toast px-4 py-3 rounded-xl border shadow-xl text-xs font-semibold flex items-center gap-2 ${bg}`;
-            toast.innerHTML = `<span>${message}</span>`;
-
-            container.appendChild(toast);
-
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
-
-        function escapeHtml(str) {
-            return String(str).replace(/[&<>"']/g, function (m) {
-                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
-            });
-        }
-    </script>
+    // Avvio
+    initQuestions();
+  </script>
 </body>
 </html>
