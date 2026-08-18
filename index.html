@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mostra Interattiva - Ritratti e Generazioni</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Firebase App e Firestore Compatibili -->
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
   <style>
@@ -144,7 +145,7 @@
         </div>
         
         <div class="border border-slate-800 rounded-xl p-4 bg-slate-950">
-          <h4 class="text-sm font-semibold text-slate-300 mb-2">Registro Partecipanti Ricevuti</h4>
+          <h4 class="text-sm font-semibold text-slate-300 mb-2">Registro Partecipanti Ricevuti (Firestore Cloud)</h4>
           <div id="adminRecordsList" class="text-xs text-slate-400 flex flex-col gap-1 max-h-48 overflow-y-auto">
             Caricamento dati in corso...
           </div>
@@ -154,7 +155,7 @@
   </div>
 
   <script>
-    // --- Configurazione Firebase ---
+    // --- Inizializzazione Firebase ---
     const firebaseConfig = {
       apiKey: "AIzaSyANnQz61NYoyY-PVCkcT1ZrKwuD96SaJs0",
       authDomain: "grapichdays.firebaseapp.com",
@@ -167,7 +168,9 @@
 
     let db = null;
     try {
-      firebase.initializeApp(firebaseConfig);
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
       db = firebase.firestore();
     } catch(e) {
       console.error("Errore inizializzazione Firebase:", e);
@@ -210,7 +213,7 @@
     let loadedUserImage = null;
     let currentSelectedKeywords = [];
 
-    // --- Inizializzazione Interfaccia Domande ---
+    // --- Inizializzazione Domande ---
     function initQuestions() {
       const container = document.getElementById("questionsContainer");
       container.innerHTML = "";
@@ -252,7 +255,7 @@
       }
     }
 
-    // --- Gestione Caricamento Foto ---
+    // --- Caricamento Foto ---
     function handleImageUpload(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -298,7 +301,7 @@
       ctx.drawImage(img, sx, sy, sWidth, sHeight, x, y, w, h);
     }
 
-    // --- Generazione Ritratto Finale Centrato ---
+    // --- Generazione Ritratto ---
     function generatePortrait() {
       const name = document.getElementById("inputName").value.trim() || "NOME";
       const ageVal = document.getElementById("inputAge").value.trim() || "0";
@@ -316,7 +319,7 @@
         }
       }
 
-      // Selezione 3 parole chiave casuali per l'intestazione superiore
+      // 3 parole chiave superiori casuali tra i SÌ
       let pool = [...activeKeywords].sort(() => 0.5 - Math.random());
       let backupPool = [...BACKUP_KEYWORDS].sort(() => 0.5 - Math.random());
       while (pool.length < 3) {
@@ -324,14 +327,14 @@
       }
       currentSelectedKeywords = pool.slice(0, 3);
 
-      // Rendering su Canvas 1080x1440 (3:4)
+      // Rendering su Canvas 1080x1440
       const canvas = document.getElementById("portraitCanvas");
       const ctx = canvas.getContext("2d");
       document.getElementById("placeholderText").classList.add("hidden");
 
       ctx.clearRect(0, 0, 1080, 1440);
 
-      // 1. Sfondo Foto
+      // 1. Sfondo
       if (loadedUserImage) {
         drawImageCover(ctx, loadedUserImage, 0, 0, 1080, 1440);
       } else {
@@ -339,10 +342,10 @@
         ctx.fillRect(0, 0, 1080, 1440);
       }
 
-      // 2. Griglia 4x4 CENTRATA (Dimensione 648x648 px, ogni cella 162x162 px)
+      // 2. Griglia 4x4 CENTRATA (648x648 px)
       const gridSize = 648;
-      const cellSize = gridSize / 4; // 162px
-      const gridOriginX = (1080 - gridSize) / 2; // Centrata a 216px
+      const cellSize = gridSize / 4;
+      const gridOriginX = (1080 - gridSize) / 2;
       const gridOriginY = 370;
 
       ctx.fillStyle = themeColor;
@@ -368,25 +371,25 @@
       ctx.font = "bold 26px Arial";
       ctx.textBaseline = "top";
 
-      // Parola 1 (Sinistra - Bianca)
+      // 1: Sinistra
       ctx.fillStyle = "#ffffff";
       ctx.textAlign = "left";
       ctx.fillText(currentSelectedKeywords[0], leftMargin, topMargin);
 
-      // Parola 2 (Centro - Bianca)
+      // 2: Centro
       ctx.textAlign = "center";
       ctx.fillText(currentSelectedKeywords[1], 1080 / 2, topMargin);
 
-      // Parola 3 (Destra - Colore del Tema)
+      // 3: Destra
       ctx.fillStyle = themeColor;
       ctx.textAlign = "right";
       ctx.fillText(currentSelectedKeywords[2], rightMargin, topMargin);
 
-      // 4. Riga Inferiore: Nome a Sinistra, ANNI al Centro-Destra, Età a Destra
+      // 4. Riga Inferiore
       const bottomY = 1380;
       ctx.textBaseline = "alphabetic";
 
-      // Nome a sinistra
+      // Nome a sinistra (3ª lettera corsivo)
       let cursorX = leftMargin;
       for (let i = 0; i < name.length; i++) {
         const char = name[i];
@@ -401,13 +404,13 @@
         cursorX += ctx.measureText(char).width + 2;
       }
 
-      // "ANNI:" prima del numero
+      // "ANNI:"
       ctx.font = "bold 58px Arial";
       ctx.fillStyle = themeColor;
       ctx.textAlign = "right";
       ctx.fillText("ANNI:", 740, bottomY);
 
-      // Numero Età allineato al margine destro
+      // Numero
       const ageString = age > 0 ? `${age}` : "";
       ctx.fillText(ageString, rightMargin, bottomY);
 
@@ -416,7 +419,7 @@
       document.getElementById("btnSubmitExhibition").disabled = false;
     }
 
-    // --- Download Immagine Ritratto Finale ---
+    // --- Download Immagine ---
     function downloadPortraitImage() {
       const canvas = document.getElementById("portraitCanvas");
       const name = document.getElementById("inputName").value.trim() || "ritratto";
@@ -426,11 +429,11 @@
       link.click();
     }
 
-    // --- Invio Dati alla Mostra (Cloud Firestore) ---
+    // --- Invio Dati a Firestore con Diagnostica Errori Chiara ---
     async function submitToExhibition() {
       const btn = document.getElementById("btnSubmitExhibition");
       btn.disabled = true;
-      btn.textContent = "⏳ Invio in corso...";
+      btn.textContent = "⏳ Invio su Cloud in corso...";
 
       const name = document.getElementById("inputName").value.trim() || "Anonimo";
       const age = parseInt(document.getElementById("inputAge").value.trim(), 10) || 0;
@@ -448,23 +451,24 @@
       };
 
       try {
-        if (db) {
-          await db.collection("mostra_risposte").add(record);
-        } else {
-          const localData = JSON.parse(localStorage.getItem("mostra_risposte_local") || "[]");
-          localData.push(record);
-          localStorage.setItem("mostra_risposte_local", JSON.stringify(localData));
+        if (!db) {
+          throw new Error("Firebase Firestore non inizializzato.");
         }
-        btn.textContent = "✅ Risposte Inviate con Successo!";
+        // Invio diretto alla raccolta 'mostra_risposte'
+        await db.collection("mostra_risposte").add(record);
+        
+        btn.textContent = "✅ Risposte Inviate alla Mostra!";
         btn.classList.remove("bg-emerald-600");
         btn.classList.add("bg-slate-700");
       } catch (err) {
-        console.error("Errore invio:", err);
-        btn.textContent = "✅ Salvato!";
+        console.error("Errore effettivo Firebase:", err);
+        alert("Errore invio Firebase: " + (err.message || err) + "\n\nAssicurati di aver creato il database 'Firestore Database' e pubblicato le regole 'allow read, write: if true;'.");
+        btn.disabled = false;
+        btn.textContent = "🚀 Riprova Invia Risposte";
       }
     }
 
-    // --- Area Riservata Curatore (Hash wittoria56@) ---
+    // --- Area Riservata Curatore (Password wittoria56@) ---
     function openAdminModal() {
       document.getElementById("adminModal").classList.remove("hidden");
     }
@@ -472,20 +476,12 @@
       document.getElementById("adminModal").classList.add("hidden");
     }
 
-    async function sha256(message) {
-      const msgBuffer = new TextEncoder().encode(message);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    }
-
-    async function verifyAdminPassword() {
-      const input = document.getElementById("adminPasswordInput").value;
+    function verifyAdminPassword() {
+      const input = document.getElementById("adminPasswordInput").value.trim();
       const errorMsg = document.getElementById("adminAuthError");
-      const targetHash = "21566cf7e4c38d172e92c21aa5c31f4ba4025b5974052829ff851218bbad5106"; // wittoria56@
-
-      const inputHash = await sha256(input);
-      if (inputHash === targetHash) {
+      
+      // Controllo diretto affidabile
+      if (input === "wittoria56@") {
         errorMsg.classList.add("hidden");
         document.getElementById("adminAuthSection").classList.add("hidden");
         document.getElementById("adminDashboardSection").classList.remove("hidden");
@@ -497,27 +493,28 @@
 
     async function loadAdminRecords() {
       const container = document.getElementById("adminRecordsList");
+      container.innerHTML = "Caricamento dati da Firestore...";
       let list = [];
-      if (db) {
-        try {
+      try {
+        if (db) {
           const snap = await db.collection("mostra_risposte").orderBy("timestamp", "desc").get();
           snap.forEach(doc => list.push(doc.data()));
-        } catch(e) {
-          list = JSON.parse(localStorage.getItem("mostra_risposte_local") || "[]");
         }
-      } else {
-        list = JSON.parse(localStorage.getItem("mostra_risposte_local") || "[]");
+      } catch(e) {
+        console.error("Errore caricamento Firestore:", e);
+        container.innerHTML = "<span class='text-rose-400'>Errore durante la lettura da Firestore: " + e.message + "</span>";
+        return;
       }
 
       if (list.length === 0) {
-        container.innerHTML = "Nessun partecipante registrato al momento.";
+        container.innerHTML = "Nessun partecipante registrato nel database Cloud.";
         return;
       }
 
       container.innerHTML = list.map((item) => `
-        <div class="py-1 border-b border-slate-800/80 flex justify-between">
+        <div class="py-1.5 border-b border-slate-800/80 flex justify-between items-center">
           <span><strong>${item.name}</strong> (${item.age} anni)</span>
-          <span class="text-slate-500">${item.responses.filter(Boolean).length}/16 SÌ</span>
+          <span class="text-slate-400">${item.responses.filter(Boolean).length}/16 SÌ &bull; <span class="text-slate-500">${new Date(item.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span></span>
         </div>
       `).join("");
     }
@@ -525,15 +522,19 @@
     // --- Esportazione CSV per Excel ---
     async function exportCSV() {
       let list = [];
-      if (db) {
-        try {
-          const snap = await db.collection("mostra_risposte").get();
+      try {
+        if (db) {
+          const snap = await db.collection("mostra_risposte").orderBy("timestamp", "desc").get();
           snap.forEach(doc => list.push(doc.data()));
-        } catch(e) {
-          list = JSON.parse(localStorage.getItem("mostra_risposte_local") || "[]");
         }
-      } else {
-        list = JSON.parse(localStorage.getItem("mostra_risposte_local") || "[]");
+      } catch(e) {
+        alert("Errore esportazione: " + e.message);
+        return;
+      }
+
+      if (list.length === 0) {
+        alert("Nessun dato presente nel database da esportare.");
+        return;
       }
 
       let csv = "Nome,Eta,Data," + QUESTIONS_DATA.map((q, i) => `D${i+1}_${q.keyword}`).join(",") + "\n";
@@ -549,13 +550,21 @@
       link.click();
     }
 
-    // --- Matrice Archetipo "Cruda" in PNG Trasparente (800x800) ---
-    function downloadAgeArchetypePNG() {
+    // --- Matrice Archetipo in PNG Trasparente (800x800) ---
+    async function downloadAgeArchetypePNG() {
       const ageVal = prompt("Inserisci l'età per cui calcolare la matrice (es. 70):", "70");
       const age = parseInt(ageVal, 10) || 50;
       const color = getColorForAge(age);
 
-      let list = JSON.parse(localStorage.getItem("mostra_risposte_local") || "[]");
+      let list = [];
+      try {
+        if (db) {
+          const snap = await db.collection("mostra_risposte").get();
+          snap.forEach(doc => list.push(doc.data()));
+        }
+      } catch(e) {
+        console.error(e);
+      }
       
       const offscreenCanvas = document.createElement("canvas");
       offscreenCanvas.width = 800;
